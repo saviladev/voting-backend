@@ -7,4 +7,5 @@ export const DEFAULT_PERMISSIONS = [
   'specialties.manage',
   'parties.manage',
   'padron.manage',
+  'elections.manage',
 ];

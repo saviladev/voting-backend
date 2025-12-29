@@ -14,24 +14,24 @@ enum PartyScope {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  dni          String   @unique @db.VarChar(8)
+  id           String    @id @default(uuid())
+  dni          String    @unique @db.VarChar(8)
   passwordHash String
-  firstName    String   @db.VarChar(100)
-  lastName     String   @db.VarChar(100)
-  phone        String   @unique @db.VarChar(20)
-  email        String   @unique @db.VarChar(254)
+  firstName    String    @db.VarChar(100)
+  lastName     String    @db.VarChar(100)
+  phone        String    @unique @db.VarChar(20)
+  email        String    @unique @db.VarChar(254)
   chapterId    String
-  isActive     Boolean  @default(true)
-  statusReason String?  @db.VarChar(255)
+  isActive     Boolean   @default(true)
+  statusReason String?   @db.VarChar(255)
   deletedAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  chapter   Chapter   @relation(fields: [chapterId], references: [id], onDelete: Restrict)
-  roles     UserRole[]
-  sessions  Session[]
-  auditLogs AuditLog[]
+  chapter             Chapter              @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  roles               UserRole[]
+  sessions            Session[]
+  auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([dni])
@@ -39,12 +39,12 @@ model User {
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique @db.VarChar(50)
+  id          String    @id @default(uuid())
+  name        String    @unique @db.VarChar(50)
   description String?
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   users       UserRole[]
   permissions RolePermission[]
@@ -65,11 +65,11 @@ model UserRole {
 }
 
 model Permission {
-  id          String   @id @default(uuid())
-  key         String   @unique @db.VarChar(100)
+  id          String    @id @default(uuid())
+  key         String    @unique @db.VarChar(100)
   description String?
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   roles RolePermission[]
 
@@ -89,11 +89,11 @@ model RolePermission {
 }
 
 model Session {
-  id         String   @id @default(uuid())
-  userId     String
-  tokenHash  String   @unique @db.VarChar(64)
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique @db.VarChar(64)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   ipHash     String?  @db.VarChar(64)
   userAgent  String?  @db.VarChar(500)
@@ -107,12 +107,12 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique @db.VarChar(64)
+  tokenHash String    @unique @db.VarChar(64)
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -121,31 +121,33 @@ model PasswordResetToken {
 }
 
 model Association {
-  id        String   @id @default(uuid())
-  name      String   @unique @db.VarChar(200)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  name      String    @unique @db.VarChar(200)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  branches Branch[]
-  parties  PoliticalParty[]
+  branches    Branch[]
+  parties     PoliticalParty[]
   specialties Specialty[]
+  elections   Election[]
 
   @@index([name])
 }
 
 model Branch {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   associationId String
-  name          String   @db.VarChar(200)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  name          String    @db.VarChar(200)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  association Association @relation(fields: [associationId], references: [id], onDelete: Restrict)
-  chapters    Chapter[]
-  parties     PoliticalParty[]
+  association        Association        @relation(fields: [associationId], references: [id], onDelete: Restrict)
+  chapters           Chapter[]
+  parties            PoliticalParty[]
   chapterSpecialties ChapterSpecialty[]
+  elections          Election[]
 
   @@unique([associationId, name])
   @@index([associationId])
@@ -153,15 +155,15 @@ model Branch {
 }
 
 model Specialty {
-  id        String   @id @default(uuid())
-  name      String   @db.VarChar(200)
+  id            String    @id @default(uuid())
+  name          String    @db.VarChar(200)
   associationId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
-  association Association @relation(fields: [associationId], references: [id], onDelete: Restrict)
-  chapters   ChapterSpecialty[]
+  association Association        @relation(fields: [associationId], references: [id], onDelete: Restrict)
+  chapters    ChapterSpecialty[]
 
   @@unique([associationId, name])
   @@index([name])
@@ -169,17 +171,18 @@ model Specialty {
 }
 
 model Chapter {
-  id          String   @id @default(uuid())
-  branchId    String
-  name        String   @db.VarChar(200)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  branchId  String
+  name      String    @db.VarChar(200)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  branch    Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
   specialties ChapterSpecialty[]
-  users     User[]
-  parties   PoliticalParty[]
+  users       User[]
+  parties     PoliticalParty[]
+  elections   Election[]
 
   @@unique([branchId, name])
   @@index([branchId])
@@ -203,21 +206,22 @@ model ChapterSpecialty {
 }
 
 model PoliticalParty {
-  id        String   @id @default(uuid())
-  name      String   @unique @db.VarChar(200)
-  acronym   String?  @db.VarChar(50)
-  scope     PartyScope @default(NATIONAL)
+  id            String     @id @default(uuid())
+  name          String     @unique @db.VarChar(200)
+  acronym       String?    @db.VarChar(50)
+  scope         PartyScope @default(NATIONAL)
   associationId String?
-  branchId  String?
-  chapterId String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  branchId      String?
+  chapterId     String?
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
 
-  association Association? @relation(fields: [associationId], references: [id], onDelete: SetNull)
-  branch      Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  chapter     Chapter?     @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  association    Association?    @relation(fields: [associationId], references: [id], onDelete: SetNull)
+  branch         Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  chapter        Chapter?        @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  candidateLists CandidateList[]
 
   @@index([name])
   @@index([isActive])
@@ -243,4 +247,76 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([action])
   @@index([createdAt])
+}
+
+model Election {
+  id          String     @id @default(uuid())
+  name        String     @db.VarChar(200)
+  description String?    @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  status      String     @default("DRAFT") // DRAFT, OPEN, CLOSED, COMPLETED
+  scope       PartyScope @default(NATIONAL)
+
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+
+  // Optional linkage depending on scope
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id])
+
+  candidateLists CandidateList[]
+  positions      ElectionPosition[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([associationId])
+  @@index([status])
+}
+
+model ElectionPosition {
+  id         String   @id @default(uuid())
+  title      String   @db.VarChar(100)
+  order      Int      @default(0)
+  electionId String
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  candidates Candidate[]
+
+  @@index([electionId])
+}
+
+model CandidateList {
+  id               String  @id @default(uuid())
+  name             String  @db.VarChar(100)
+  number           Int?
+  electionId       String
+  politicalPartyId String?
+
+  election       Election        @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  politicalParty PoliticalParty? @relation(fields: [politicalPartyId], references: [id])
+
+  candidates Candidate[]
+
+  @@index([electionId])
+}
+
+model Candidate {
+  id        String  @id @default(uuid())
+  firstName String  @db.VarChar(100)
+  lastName  String  @db.VarChar(100)
+  dni       String? @db.VarChar(20)
+  photoUrl  String?
+
+  candidateListId String
+  candidateList   CandidateList @relation(fields: [candidateListId], references: [id], onDelete: Cascade)
+
+  positionId String
+  position   ElectionPosition @relation(fields: [positionId], references: [id], onDelete: Restrict)
+
+  @@index([candidateListId])
+  @@index([positionId])
 }

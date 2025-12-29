@@ -13,10 +13,13 @@ import { ChaptersModule } from './chapters/chapters.module';
 import { PartiesModule } from './parties/parties.module';
 import { SpecialtiesModule } from './specialties/specialties.module';
 import { PadronModule } from './padron/padron.module';
+import { ElectionsModule } from './elections/elections.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuditModule,
     AuthModule,
@@ -28,6 +31,7 @@ import { PadronModule } from './padron/padron.module';
     PartiesModule,
     SpecialtiesModule,
     PadronModule,
+    ElectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

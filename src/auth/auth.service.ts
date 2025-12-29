@@ -9,12 +9,16 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { parseDurationToSeconds } from '../common/utils/date.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { sha256 } from '../common/utils/hash.util';
+import { MailService } from '../notifications/mail.service';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
@@ -40,6 +44,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private auditService: AuditService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -169,6 +174,77 @@ export class AuthService {
         permissions,
       },
     };
+  }
+
+  async requestPasswordReset(dto: ForgotPasswordDto) {
+    const genericResponse = { message: 'If the account exists, an email has been sent.' };
+    const user = await this.prisma.user.findUnique({ where: { dni: dto.dni } });
+    if (!user || user.deletedAt || !user.email) {
+      return genericResponse;
+    }
+
+    const ttlSeconds = parseDurationToSeconds(
+      this.configService.get<string>('PASSWORD_RESET_EXPIRES_IN'),
+      3600,
+    );
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = sha256(token);
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const baseUrl =
+      this.configService.get<string>('PASSWORD_RESET_URL') ?? 'http://localhost:8100/login/reset';
+    const resetUrl = `${baseUrl}?token=${token}`;
+    await this.mailService.sendPasswordResetEmail({
+      to: user.email,
+      fullName: `${user.firstName} ${user.lastName}`.trim() || 'Colegiado',
+      resetUrl,
+    });
+
+    await this.auditService.log('PASSWORD_RESET_REQUEST', 'User', user.id, { userId: user.id });
+
+    return genericResponse;
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = sha256(dto.token);
+    const now = new Date();
+    const record = await this.prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash,
+        usedAt: null,
+        expiresAt: { gt: now },
+      },
+      include: { user: true },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    const passwordHash = await argon2.hash(dto.password);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      });
+      await tx.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: now },
+      });
+      await tx.session.deleteMany({ where: { userId: record.userId } });
+    });
+
+    await this.auditService.log('PASSWORD_RESET', 'User', record.userId, { userId: record.userId });
+
+    return { message: 'Password updated' };
   }
 
   async logout(rawToken?: string, userId?: string) {

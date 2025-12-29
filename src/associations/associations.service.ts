@@ -17,18 +17,26 @@ export class AssociationsService {
   }
 
   async create(dto: CreateAssociationDto) {
-    try {
-      const association = await this.prisma.association.create({ data: { name: dto.name } });
-      await this.auditService.log('ASSOCIATION_CREATE', 'Association', association.id, {
-        metadata: { name: association.name },
-      });
-      return association;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Association already exists');
+    const existing = await this.prisma.association.findFirst({ where: { name: dto.name } });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.association.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, name: dto.name },
+        });
+        await this.auditService.log('ASSOCIATION_RESTORE', 'Association', restored.id, {
+          metadata: { name: restored.name },
+        });
+        return restored;
       }
-      throw error;
+      throw new ConflictException('Association already exists');
     }
+
+    const association = await this.prisma.association.create({ data: { name: dto.name } });
+    await this.auditService.log('ASSOCIATION_CREATE', 'Association', association.id, {
+      metadata: { name: association.name },
+    });
+    return association;
   }
 
   async update(id: string, dto: UpdateAssociationDto) {

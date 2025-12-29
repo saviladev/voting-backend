@@ -26,20 +26,29 @@ export class SpecialtiesService {
     if (!association) {
       throw new NotFoundException('Association not found');
     }
-    try {
-      const specialty = await this.prisma.specialty.create({
-        data: { name: dto.name, associationId: dto.associationId },
-      });
-      await this.auditService.log('SPECIALTY_CREATE', 'Specialty', specialty.id, {
-        metadata: { name: specialty.name },
-      });
-      return specialty;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Specialty already exists');
+    const existing = await this.prisma.specialty.findFirst({
+      where: { associationId: dto.associationId, name: dto.name },
+    });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.specialty.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, name: dto.name, associationId: dto.associationId },
+        });
+        await this.auditService.log('SPECIALTY_RESTORE', 'Specialty', restored.id, {
+          metadata: { name: restored.name },
+        });
+        return restored;
       }
-      throw error;
+      throw new ConflictException('Specialty already exists');
     }
+    const specialty = await this.prisma.specialty.create({
+      data: { name: dto.name, associationId: dto.associationId },
+    });
+    await this.auditService.log('SPECIALTY_CREATE', 'Specialty', specialty.id, {
+      metadata: { name: specialty.name },
+    });
+    return specialty;
   }
 
   async update(id: string, dto: UpdateSpecialtyDto) {

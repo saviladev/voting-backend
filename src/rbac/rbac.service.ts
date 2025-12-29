@@ -80,6 +80,61 @@ export class RbacService {
 
     const passwordHash = await argon2.hash(dto.password);
 
+    const existing = await this.prisma.user.findUnique({ where: { dni: dto.dni } });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.$transaction(async (tx) => {
+          const restoredUser = await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              deletedAt: null,
+              passwordHash,
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              phone: dto.phone,
+              email: dto.email,
+              chapterId: dto.chapterId,
+              isActive: true,
+            },
+          });
+
+          await tx.userRole.deleteMany({ where: { userId: restoredUser.id } });
+          const roleIds = new Set<string>();
+          roles.forEach((role) => roleIds.add(role.id));
+          if (memberRole) {
+            roleIds.add(memberRole.id);
+          }
+          if (roleIds.size > 0) {
+            await tx.userRole.createMany({
+              data: Array.from(roleIds).map((roleId) => ({ userId: restoredUser.id, roleId })),
+              skipDuplicates: true,
+            });
+          }
+
+          return restoredUser;
+        });
+
+        await this.auditService.log('RBAC_RESTORE_USER', 'User', restored.id, {
+          userId: restored.id,
+          metadata: { dni: restored.dni },
+        });
+
+        return this.prisma.user.findUnique({
+          where: { id: restored.id },
+          include: {
+            chapter: {
+              include: {
+                branch: { include: { association: true } },
+                specialties: { include: { specialty: true } },
+              },
+            },
+            roles: { where: { role: { deletedAt: null } }, include: { role: true } },
+          },
+        });
+      }
+      throw new ConflictException('User already exists');
+    }
+
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -226,15 +281,26 @@ export class RbacService {
   }
 
   async createRole(dto: CreateRoleDto) {
-    try {
-      const role = await this.prisma.role.create({ data: dto });
-      await this.auditService.log('RBAC_CREATE_ROLE', 'Role', role.id, {
-        metadata: { name: role.name },
-      });
-      return role;
-    } catch (error) {
-      this.handleUnique(error, 'Role already exists');
+    const existing = await this.prisma.role.findFirst({ where: { name: dto.name } });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.role.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, description: dto.description ?? existing.description },
+        });
+        await this.auditService.log('RBAC_RESTORE_ROLE', 'Role', restored.id, {
+          metadata: { name: restored.name },
+        });
+        return restored;
+      }
+      throw new ConflictException('Role already exists');
     }
+
+    const role = await this.prisma.role.create({ data: dto });
+    await this.auditService.log('RBAC_CREATE_ROLE', 'Role', role.id, {
+      metadata: { name: role.name },
+    });
+    return role;
   }
 
   async updateRole(id: string, dto: UpdateRoleDto) {
@@ -254,15 +320,27 @@ export class RbacService {
   }
 
   async createPermission(dto: CreatePermissionDto) {
-    try {
-      const permission = await this.prisma.permission.create({ data: dto });
-      await this.auditService.log('RBAC_CREATE_PERMISSION', 'Permission', permission.id, {
-        metadata: { key: permission.key },
-      });
-      return permission;
-    } catch (error) {
-      this.handleUnique(error, 'Permission already exists');
+    const existing = await this.prisma.permission.findFirst({
+      where: { key: dto.key },
+    });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.permission.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, description: dto.description ?? existing.description },
+        });
+        await this.auditService.log('RBAC_RESTORE_PERMISSION', 'Permission', restored.id, {
+          metadata: { key: restored.key },
+        });
+        return restored;
+      }
+      throw new ConflictException('Permission already exists');
     }
+    const permission = await this.prisma.permission.create({ data: dto });
+    await this.auditService.log('RBAC_CREATE_PERMISSION', 'Permission', permission.id, {
+      metadata: { key: permission.key },
+    });
+    return permission;
   }
 
   async updatePermission(id: string, dto: UpdatePermissionDto) {

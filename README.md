@@ -1,6 +1,6 @@
 ## Voting Backend (NestJS + Prisma)
 
-Backend para gestión de elecciones, RBAC y votación anónima. Incluye auth con DNI+password, sesión única, roles/permisos, procesos electorales, categorías, y emisión de voto anónima.
+Backend para gestión de colegiados con Auth, RBAC, estructura organizacional (Association/Branch/Chapter/Specialty), partidos políticos, padrón por Excel y auditoría. Incluye auth con DNI+password y sesión única.
 
 ### Requisitos
 
@@ -16,17 +16,28 @@ cp .env.example .env
 Variables clave:
 - `DATABASE_URL=postgresql://user:pass@localhost:5432/voting`
 - `JWT_SECRET` y `JWT_EXPIRES_IN` (ej. `15m`)
-- `ADMIN_DNI` y `ADMIN_PASSWORD` para el usuario seed admin
-- `ADMIN_EMAIL`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME`, `ADMIN_LOCATION_CODE` (opcionales para el admin)
+- `PASSWORD_RESET_EXPIRES_IN` (ej. `1h`)
+- `PASSWORD_RESET_URL` (ej. `http://localhost:8100/login/reset`)
 - `CORS_ORIGINS` (lista separada por comas, ej. `http://localhost:8100,http://localhost:3000`)
-- `AUDITOR_DNI`, `AUDITOR_PASSWORD`, `VOTER1_DNI`, `VOTER1_PASSWORD`, `VOTER2_DNI`, `VOTER2_PASSWORD` (opcionales para usuarios demo)
+- `ADMIN_DNI`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` (seed admin)
+- `ASSOCIATION_NAME`, `BRANCH_NAME`, `SPECIALTY_NAME`, `CHAPTER_NAME` (seed estructura básica)
+
+Opcional para correos de padrón:
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
 2) Instala dependencias:
 ```
 npm install
 ```
 
-3) Genera cliente y aplica migraciones:
+3) Flujo recomendado (reset + init):
+```
+npx prisma migrate reset
+npm run prisma:generate
+npm run prisma:migrate -- --name init
+```
+
+Si no deseas resetear:
 ```
 npm run prisma:generate
 npm run prisma:migrate -- --name init
@@ -37,10 +48,7 @@ npm run prisma:migrate -- --name init
 npm run prisma:seed
 ```
 
-El seed también importa ubigeo si existen los CSV en la raíz del backend:
-- `ubigeo_peru_2016_departamentos.csv`
-- `ubigeo_peru_2016_provincias.csv`
-- `ubigeo_peru_2016_distritos.csv`
+El seed crea permisos, roles, estructura base y usuario SystemAdmin.
 
 ### Ejecutar
 ```
@@ -49,25 +57,53 @@ npm run start:dev
 Swagger disponible en `http://localhost:3000/docs`. Health check en `/health`.
 
 ### Módulos y endpoints principales
-- Auth: `POST /auth/register`, `POST /auth/login`, `POST /auth/logout` (JWT + Session.tokenHash).
-- RBAC: roles/permisos y asignaciones bajo `/rbac/*` con guard de permisos.
-- Elections:
-  - Procesos: `GET/POST /elections/processes`
-  - Categorías: `GET/POST /elections/categories`
-  - Elecciones: `GET/POST/PATCH /elections`, `POST /elections/:id/open`, `POST /elections/:id/close`
-  - Listas y candidatos: `GET /elections/:id/lists`, `POST /elections/:id/lists`, `POST /elections/lists/:listId/candidates`
-- Organizations: `GET/POST/PATCH/DELETE /organizations`
-- Voting: `GET /voting/elections/:id/ballot`, `POST /voting/elections/:id/vote` (requiere `voting.cast`).
-- Reports: `GET /reports/elections/:id/results`, `GET /reports/processes/:id/results` (requiere `reports.read`).
-- Geo: `GET /geo/regions`, `GET /geo/regions/:id/provinces`, `GET /geo/provinces/:id/districts`.
+- Auth: `POST /auth/login`, `POST /auth/logout` (JWT + Session.tokenHash).
+- Password reset: `POST /auth/forgot-password`, `POST /auth/reset-password`.
+- Users: `GET /users/me`, `PATCH /users/me`.
+- RBAC: roles, permisos y usuarios bajo `/rbac/*` (incluye asignaciones por DNI).
+- Structure: `GET/POST/PATCH/DELETE` para `/associations`, `/branches`, `/specialties`, `/chapters`.
+- Political parties: `GET/POST/PATCH/DELETE /parties`.
+- Padron (XLSX): `POST /padron/import`.
+- Audit: `GET /audit`.
 
 ### Scripts útiles
 - `start:dev`: servidor en watch mode.
 - `prisma:generate`: genera cliente Prisma.
 - `prisma:migrate`: aplica migraciones (dev).
-- `prisma:seed`: crea roles/permisos base y usuario ADMIN.
+- `prisma:seed`: crea permisos, roles, estructura base y usuario SystemAdmin.
+
+### Comandos esenciales (DB)
+Si ya existen migraciones (por ejemplo `init`) y solo quieres aplicar el esquema actual:
+```
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+Solo usa reset cuando quieras borrar datos y reiniciar todo:
+```
+npx prisma migrate reset
+npm run prisma:generate
+npm run prisma:migrate -- --name init
+npm run prisma:seed
+```
+
+Solo regenerar cliente:
+```
+npm run prisma:generate
+```
+
+### Padron (Excel)
+El padrón acepta archivos `.xlsx` con las columnas:
+- `dni` (8 dígitos)
+- `firstName`, `lastName`, `email`, `phone`
+- `branchName` (Sede), `chapterName` (Capítulo)
+- `isPaidUp` (booleano; acepta `true/false`, `1/0`, `si/no`)
+
+Se validan el capítulo/sede. Los usuarios se crean o actualizan y reciben una clave temporal de 12 dígitos por correo (si `SMTP_*` está configurado). Si `isPaidUp=false`, el usuario queda desactivado (`isActive=false`). El mismo import gestiona altas, actualizaciones y desactivaciones.
+
+Ejemplos de archivo (mismo formato, se procesan con `/padron/import`): `padron_import.xlsx` y `padron_status_update.xlsx` en la raíz del backend.
 
 ### Notas
-- Referendums se crean como `BINARY` y generan opciones SI/NO automáticamente.
-- Ubigeos se almacenan en la tabla `Location` con jerarquía departamento/provincia/distrito.
-- Logos/multimedia se guardan como URL en `PoliticalOrganization.logoUrl`.
+- Todas las operaciones `DELETE` son soft-delete (usa `deletedAt`).
+- Sesión única: cada login invalida sesiones anteriores.

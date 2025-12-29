@@ -44,7 +44,6 @@ export class PadronService {
     file: PadronFile,
     adminUserId: string,
     roles: string[],
-    mode: 'IMPORT' | 'DISABLE',
   ): Promise<PadronImportResultDto> {
     if (!file?.buffer) {
       throw new BadRequestException('Missing file');
@@ -128,10 +127,9 @@ export class PadronService {
       const isActive = isPaidUp;
 
       const existing = await this.prisma.user.findUnique({ where: { dni } });
-      const tempPassword = this.generatePassword();
-      const passwordHash = await argon2.hash(tempPassword);
 
       if (existing) {
+        const wasActive = existing.isActive;
         await this.prisma.user.update({
           where: { dni },
           data: {
@@ -142,25 +140,26 @@ export class PadronService {
             chapterId: chapterId ?? existing.chapterId,
             isActive,
             deletedAt: null,
-            passwordHash,
           },
         });
         result.updated += 1;
-        if (isActive === false) {
+        if (wasActive && !isActive) {
           await this.prisma.session.deleteMany({ where: { userId: existing.id } });
           result.disabled += 1;
         }
-        const emailTarget = row.email ?? existing.email;
-        if (emailTarget) {
-          await this.mailService.sendAccountStatusEmail({
-            to: emailTarget,
-            fullName: this.formatName(row, existing),
-            dni,
-            isActive,
-            tempPassword,
-          });
+        if (wasActive !== isActive) {
+          const emailTarget = row.email ?? existing.email;
+          if (emailTarget) {
+            await this.mailService.sendAccountStatusChangeEmail({
+              to: emailTarget,
+              fullName: this.formatName(row, existing),
+              isActive,
+            });
+          }
         }
       } else {
+        const tempPassword = this.generatePassword();
+        const passwordHash = await argon2.hash(tempPassword);
         const email = row.email ?? `${dni}@example.com`;
         const phone = row.phone ?? `tmp-${dni}`;
         try {
@@ -212,8 +211,7 @@ export class PadronService {
     }
 
     if (result.rejected.length > 0) {
-      const action = mode === 'DISABLE' ? 'deshabilitarse' : 'registrarse';
-      result.message = `Estos usuarios no pudieron ${action} porque sus capítulos no te corresponden: ${result.rejected.join(', ')}`;
+      result.message = `Estos usuarios no pudieron registrarse porque sus capítulos no te corresponden: ${result.rejected.join(', ')}`;
     }
 
     return result;

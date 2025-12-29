@@ -55,6 +55,39 @@ export class ChaptersService {
       }
     }
 
+    const existing = await this.prisma.chapter.findFirst({
+      where: { branchId: dto.branchId, name: dto.name },
+    });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.chapter.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, name: dto.name, branchId: dto.branchId },
+        });
+        if (dto.specialtyIds) {
+          await this.prisma.chapterSpecialty.deleteMany({ where: { chapterId: restored.id } });
+          if (dto.specialtyIds.length > 0) {
+            await this.prisma.chapterSpecialty.createMany({
+              data: dto.specialtyIds.map((specialtyId) => ({
+                chapterId: restored.id,
+                specialtyId,
+                branchId: branch.id,
+              })),
+            });
+          }
+        }
+        await this.auditService.log('CHAPTER_RESTORE', 'Chapter', restored.id, {
+          metadata: {
+            name: restored.name,
+            branchId: restored.branchId,
+            specialtyIds: dto.specialtyIds,
+          },
+        });
+        return restored;
+      }
+      throw new ConflictException('Chapter already exists for this branch');
+    }
+
     try {
       const chapter = await this.prisma.chapter.create({
         data: {

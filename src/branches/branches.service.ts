@@ -25,23 +25,33 @@ export class BranchesService {
       throw new NotFoundException('Association not found');
     }
 
-    try {
-      const branch = await this.prisma.branch.create({
-        data: {
-          associationId: dto.associationId,
-          name: dto.name,
-        },
-      });
-      await this.auditService.log('BRANCH_CREATE', 'Branch', branch.id, {
-        metadata: { name: branch.name, associationId: branch.associationId },
-      });
-      return branch;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Branch already exists');
+    const existing = await this.prisma.branch.findFirst({
+      where: { associationId: dto.associationId, name: dto.name },
+    });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.branch.update({
+          where: { id: existing.id },
+          data: { deletedAt: null, name: dto.name, associationId: dto.associationId },
+        });
+        await this.auditService.log('BRANCH_RESTORE', 'Branch', restored.id, {
+          metadata: { name: restored.name, associationId: restored.associationId },
+        });
+        return restored;
       }
-      throw error;
+      throw new ConflictException('Branch already exists');
     }
+
+    const branch = await this.prisma.branch.create({
+      data: {
+        associationId: dto.associationId,
+        name: dto.name,
+      },
+    });
+    await this.auditService.log('BRANCH_CREATE', 'Branch', branch.id, {
+      metadata: { name: branch.name, associationId: branch.associationId },
+    });
+    return branch;
   }
 
   async update(id: string, dto: UpdateBranchDto) {

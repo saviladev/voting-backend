@@ -19,23 +19,41 @@ export class PartiesService {
 
   async createParty(dto: CreatePartyDto) {
     const scopeData = await this.buildScopeData(dto);
-    try {
-      const party = await this.prisma.politicalParty.create({
-        data: {
-          name: dto.name,
-          acronym: dto.acronym,
-          scope: scopeData.scope,
-          associationId: scopeData.associationId,
-          branchId: scopeData.branchId,
-          chapterId: scopeData.chapterId,
-          isActive: dto.isActive ?? true,
-        },
-      });
-      await this.auditService.log('PARTY_CREATED', 'PoliticalParty', party.id, {});
-      return party;
-    } catch (error) {
-      this.handleUnique(error, 'Party already exists');
+    const existing = await this.prisma.politicalParty.findFirst({ where: { name: dto.name } });
+    if (existing) {
+      if (existing.deletedAt) {
+        const restored = await this.prisma.politicalParty.update({
+          where: { id: existing.id },
+          data: {
+            deletedAt: null,
+            name: dto.name,
+            acronym: dto.acronym,
+            scope: scopeData.scope,
+            associationId: scopeData.associationId,
+            branchId: scopeData.branchId,
+            chapterId: scopeData.chapterId,
+            isActive: dto.isActive ?? true,
+          },
+        });
+        await this.auditService.log('PARTY_RESTORE', 'PoliticalParty', restored.id, {});
+        return restored;
+      }
+      throw new ConflictException('Party already exists');
     }
+
+    const party = await this.prisma.politicalParty.create({
+      data: {
+        name: dto.name,
+        acronym: dto.acronym,
+        scope: scopeData.scope,
+        associationId: scopeData.associationId,
+        branchId: scopeData.branchId,
+        chapterId: scopeData.chapterId,
+        isActive: dto.isActive ?? true,
+      },
+    });
+    await this.auditService.log('PARTY_CREATED', 'PoliticalParty', party.id, {});
+    return party;
   }
 
   async updateParty(id: string, dto: UpdatePartyDto) {

@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -22,7 +22,21 @@ export class PadronController {
 
   @Permissions('padron.manage')
   @Post('import')
+  @ApiOperation({
+    summary: 'Importar padrón (crea, actualiza, activa/desactiva según isPaidUp)',
+  })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 5 * 1024 * 1024 },
@@ -35,24 +49,8 @@ export class PadronController {
     }),
   )
   import(@UploadedFile() file: PadronFile, @CurrentUser() user: RequestUser) {
-    return this.padronService.importPadron(file, user.id, user.roles, 'IMPORT');
+    return this.padronService.importPadron(file, user.id, user.roles);
   }
 
-  @Permissions('padron.manage')
-  @Post('disable')
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_req, file, callback) => {
-        if (!file.originalname.toLowerCase().endsWith('.xlsx')) {
-          return callback(new BadRequestException('Only .xlsx files are allowed'), false);
-        }
-        callback(null, true);
-      },
-    }),
-  )
-  disable(@UploadedFile() file: PadronFile, @CurrentUser() user: RequestUser) {
-    return this.padronService.importPadron(file, user.id, user.roles, 'DISABLE');
-  }
+  // /padron/disable removido: el flujo se unifica en /padron/import con isPaidUp.
 }

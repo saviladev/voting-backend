@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ElectionsService } from './elections.service';
 import { CreateElectionDto } from './dto/create-election.dto';
 import { CreateCandidateListDto } from './dto/create-candidate-list.dto';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
+import { UpdateVoteCountDto } from './dto/update-vote-count.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -73,5 +74,40 @@ export class ElectionsController {
   @Delete('candidates/:candidateId')
   deleteCandidate(@Param('candidateId') candidateId: string) {
     return this.electionsService.deleteCandidate(candidateId);
+  }
+
+  // NEW: Update vote count for a candidate
+  @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Patch('candidates/:candidateId/vote-count')
+  updateVoteCount(
+    @Param('candidateId') candidateId: string,
+    @Body() dto: UpdateVoteCountDto,
+  ) {
+    return this.electionsService.updateCandidateVoteCount(candidateId, dto);
+  }
+
+  // NEW: Get election results (COMPLETED elections only)
+  @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Get(':id/results')
+  getResults(@Param('id') id: string) {
+    return this.electionsService.getElectionResults(id);
+  }
+
+  // NEW: Get results by position
+  @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Get(':id/results/by-position')
+  getResultsByPosition(@Param('id') id: string) {
+    return this.electionsService.getResultsByPosition(id);
+  }
+
+  // NEW: Get results by list
+  @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Get(':id/results/by-list')
+  getResultsByList(@Param('id') id: string) {
+    return this.electionsService.getResultsByList(id);
   }
 }

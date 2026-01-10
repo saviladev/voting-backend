@@ -9,9 +9,75 @@ import { UpdatePartyDto } from './dto/update-party.dto';
 export class PartiesService {
   constructor(private prisma: PrismaService, private auditService: AuditService) {}
 
-  listParties() {
+  listParties(filters?: {
+    scope?: string;
+    associationId?: string;
+    branchId?: string;
+    chapterId?: string;
+  }) {
+    // If no scope filter is provided, return all parties
+    if (!filters?.scope) {
+      return this.prisma.politicalParty.findMany({
+        where: { deletedAt: null },
+        include: { association: true, branch: true, chapter: true },
+        orderBy: { name: 'asc' },
+      });
+    }
+
+    // Build hierarchical filter based on election scope
+    // A party is valid for an election if:
+    // - Party scope is NATIONAL (available for all elections)
+    // - Party scope matches election scope AND belongs to the same entity
+    // - Party scope is "higher" in hierarchy (e.g., ASSOCIATION party can be used in BRANCH/CHAPTER elections of that association)
+    
+    const whereConditions: any[] = [];
+    
+    // National parties are always available
+    whereConditions.push({ scope: 'NATIONAL' });
+    
+    if (filters.scope === 'ASSOCIATION' && filters.associationId) {
+      // For ASSOCIATION elections: show NATIONAL + ASSOCIATION parties of the same association
+      whereConditions.push({
+        scope: 'ASSOCIATION',
+        associationId: filters.associationId,
+      });
+    } else if (filters.scope === 'BRANCH' && filters.branchId) {
+      // For BRANCH elections: show NATIONAL + ASSOCIATION (if associationId provided) + BRANCH parties of the same branch
+      if (filters.associationId) {
+        whereConditions.push({
+          scope: 'ASSOCIATION',
+          associationId: filters.associationId,
+        });
+      }
+      whereConditions.push({
+        scope: 'BRANCH',
+        branchId: filters.branchId,
+      });
+    } else if (filters.scope === 'CHAPTER' && filters.chapterId) {
+      // For CHAPTER elections: show NATIONAL + ASSOCIATION + BRANCH + CHAPTER parties
+      if (filters.associationId) {
+        whereConditions.push({
+          scope: 'ASSOCIATION',
+          associationId: filters.associationId,
+        });
+      }
+      if (filters.branchId) {
+        whereConditions.push({
+          scope: 'BRANCH',
+          branchId: filters.branchId,
+        });
+      }
+      whereConditions.push({
+        scope: 'CHAPTER',
+        chapterId: filters.chapterId,
+      });
+    }
+
     return this.prisma.politicalParty.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: whereConditions,
+      },
       include: { association: true, branch: true, chapter: true },
       orderBy: { name: 'asc' },
     });

@@ -3,17 +3,145 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateElectionDto } from './dto/create-election.dto';
 import { CreateCandidateListDto } from './dto/create-candidate-list.dto';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
-import { UpdateVoteCountDto } from './dto/update-vote-count.dto';
 import {
   ElectionResultsDto,
   CandidateResultDto,
   ListResultDto,
   PositionResultDto,
 } from './dto/results.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ElectionsService {
   constructor(private prisma: PrismaService) {}
+
+  // =================================================================
+  // == Member-specific methods
+  // =================================================================
+
+  async getVotableElections(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        chapter: {
+          include: {
+            branch: {
+              include: {
+                association: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const now = new Date();
+
+    // Find all open elections relevant to the user's hierarchy
+    const openElections = await this.prisma.election.findMany({
+      where: {
+        status: 'OPEN',
+        startDate: { lte: now },
+        endDate: { gte: now },
+        // Filter by the user's association, and optionally by branch and chapter
+        associationId: user.chapter.branch.associationId,
+        OR: [
+          { scope: 'ASSOCIATION' },
+          { scope: 'BRANCH', branchId: user.chapter.branchId },
+          { scope: 'CHAPTER', chapterId: user.chapterId },
+        ],
+      },
+    });
+
+    // Find all elections the user has already voted in
+    const userVotes = await this.prisma.vote.findMany({
+      where: { userId },
+      select: { electionId: true },
+    });
+    const votedElectionIds = userVotes.map(v => v.electionId);
+
+    // Filter out elections where the user has already voted
+    return openElections.filter(e => !votedElectionIds.includes(e.id));
+  }
+
+  async vote(electionId: string, userId: string, candidateId: string) {
+    const now = new Date();
+
+    // 1. Fetch all required data in parallel
+    const [election, user, candidate, existingVote] = await Promise.all([
+      this.prisma.election.findUnique({ where: { id: electionId } }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          chapter: { include: { branch: true } },
+        },
+      }),
+      this.prisma.candidate.findUnique({
+        where: { id: candidateId },
+        include: { candidateList: true },
+      }),
+      this.prisma.vote.findUnique({
+        where: { userId_electionId: { userId, electionId } },
+      }),
+    ]);
+
+    // 2. Perform validations
+    if (!election) throw new NotFoundException('Election not found');
+    if (election.status !== 'OPEN' || election.startDate > now || election.endDate < now) {
+      throw new ForbiddenException('This election is not open for voting.');
+    }
+    if (!user || !user.isActive) throw new NotFoundException('User not found or is not active.');
+    if (existingVote) throw new ForbiddenException('You have already voted in this election.');
+    if (!candidate) throw new NotFoundException('Candidate not found.');
+    if (candidate.candidateList.electionId !== electionId) {
+      throw new ForbiddenException('This candidate does not belong to this election.');
+    }
+
+    // 3. Strong eligibility check
+    const isEligible =
+      election.associationId === user.chapter.branch.associationId &&
+      (election.scope === 'ASSOCIATION' ||
+        (election.scope === 'BRANCH' && election.branchId === user.chapter.branchId) ||
+        (election.scope === 'CHAPTER' && election.chapterId === user.chapterId));
+
+    if (!isEligible) {
+      throw new ForbiddenException('You are not eligible to vote in this election.');
+    }
+
+    // 4. Execute transaction
+    return this.prisma.$transaction(async (tx) => {
+      // Create the vote record
+      const vote = await tx.vote.create({
+        data: {
+          electionId,
+          userId,
+          candidateId,
+        },
+      });
+
+      // Increment the candidate's vote count
+      await tx.candidate.update({
+        where: { id: candidateId },
+        data: {
+          voteCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      return {
+        message: 'Vote cast successfully',
+        voteId: vote.id,
+      };
+    });
+  }
+
+
+  // =================================================================
+  // == Admin-specific methods
+  // =================================================================
 
   async create(dto: CreateElectionDto) {
     const { positions, ...data } = dto;
@@ -152,19 +280,6 @@ export class ElectionsService {
   async deleteCandidate(candidateId: string) {
     return this.prisma.candidate.delete({
       where: { id: candidateId }
-    });
-  }
-
-  // NEW: Update vote count for a candidate
-  async updateCandidateVoteCount(candidateId: string, dto: UpdateVoteCountDto) {
-    const candidate = await this.prisma.candidate.findUnique({
-      where: { id: candidateId },
-    });
-    if (!candidate) throw new NotFoundException('Candidate not found');
-
-    return this.prisma.candidate.update({
-      where: { id: candidateId },
-      data: { voteCount: dto.voteCount },
     });
   }
 

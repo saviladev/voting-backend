@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import * as argon2 from 'argon2';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -20,68 +22,96 @@ export class UsersService {
     }
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
-      include: {
+      select: {
+        id: true,
+        dni: true,
+        isActive: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
         chapter: {
-          include: {
-            branch: { include: { association: true } },
-            specialties: { include: { specialty: true } },
-          },
-        },
-      },
+          select: {
+            id: true,
+            name: true,
+            branch: {
+              select: {
+                id: true,
+                name: true,
+                association: {
+                  select: {
+                    id: true,
+                    name: true,
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return {
-      id: user.id,
-      dni: user.dni,
-      isActive: user.isActive,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      email: user.email,
-      chapterId: user.chapterId,
-      chapter: user.chapter,
-    };
+    return user;
   }
 
-  async updateProfile(userId?: string, dto?: UpdateProfileDto) {
-    if (!userId) {
-      throw new NotFoundException('User not found');
-    }
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
     const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
+    const dataToUpdate: Prisma.UserUpdateInput = {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phone: dto.phone,
+      email: dto.email,
+    };
+
+    // Handle password change
+    if (dto.newPassword && dto.oldPassword) {
+      const passwordMatch = await argon2.verify(user.passwordHash, dto.oldPassword);
+      if (!passwordMatch) {
+        throw new BadRequestException('Invalid old password');
+      }
+      dataToUpdate.passwordHash = await argon2.hash(dto.newPassword);
+    } else if (dto.newPassword && !dto.oldPassword) {
+      throw new BadRequestException('Old password is required to set a new password.');
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        firstName: dto?.firstName,
-        lastName: dto?.lastName,
-        phone: dto?.phone,
-        email: dto?.email,
-      },
-      include: {
+      data: dataToUpdate,
+      select: {
+        id: true,
+        dni: true,
+        isActive: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
         chapter: {
-          include: {
-            branch: { include: { association: true } },
-            specialties: { include: { specialty: true } },
-          },
-        },
-      },
+          select: {
+            id: true,
+            name: true,
+            branch: {
+              select: {
+                id: true,
+                name: true,
+                association: {
+                  select: {
+                    id: true,
+                    name: true,
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
-    return {
-      id: updated.id,
-      dni: updated.dni,
-      isActive: updated.isActive,
-      firstName: updated.firstName,
-      lastName: updated.lastName,
-      phone: updated.phone,
-      email: updated.email,
-      chapterId: updated.chapterId,
-      chapter: updated.chapter,
-    };
+    return updated;
   }
 }

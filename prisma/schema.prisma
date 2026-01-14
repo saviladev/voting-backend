@@ -33,6 +33,7 @@ model User {
   sessions            Session[]
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  votes               Vote[]
 
   @@index([dni])
   @@index([chapterId])
@@ -269,6 +270,7 @@ model Election {
 
   candidateLists CandidateList[]
   positions      ElectionPosition[]
+  votes          Vote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -318,6 +320,25 @@ model Candidate {
   positionId String
   position   ElectionPosition @relation(fields: [positionId], references: [id], onDelete: Restrict)
 
+  votes Vote[]
+
   @@index([candidateListId])
   @@index([positionId])
+}
+
+model Vote {
+  id          String   @id @default(uuid())
+  electionId  String
+  userId      String
+  candidateId String
+  createdAt   DateTime @default(now())
+
+  election  Election  @relation(fields: [electionId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@unique([userId, electionId]) // Evita que un usuario vote dos veces en la misma elección.
+  @@index([electionId])
+  @@index([userId])
+  @@index([candidateId])
 }

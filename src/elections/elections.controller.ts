@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ElectionsService } from './elections.service';
 import { CreateElectionDto } from './dto/create-election.dto';
@@ -11,13 +20,13 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/interfaces/request-user.interface';
-import { CreateVoteDto } from './dto/create-vote.dto';
+import { BulkVoteDto } from './dto/bulk-vote.dto';
 
 @ApiTags('elections')
 @ApiBearerAuth()
 @Controller('elections')
 export class ElectionsController {
-  constructor(private readonly electionsService: ElectionsService) { }
+  constructor(private readonly electionsService: ElectionsService) {}
 
   // =================================================================
   // == Member-specific endpoints
@@ -30,6 +39,7 @@ export class ElectionsController {
     return this.electionsService.getVotableElections(user.id);
   }
 
+  /*
   @Roles('Member')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':id/vote')
@@ -39,6 +49,18 @@ export class ElectionsController {
     @Body() dto: CreateVoteDto,
   ) {
     return this.electionsService.vote(electionId, user.id, dto.candidateId);
+  }
+  */
+
+  @Roles('Member')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post(':id/bulk-vote')
+  bulkVote(
+    @Param('id') electionId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: BulkVoteDto,
+  ) {
+    return this.electionsService.bulkVote(electionId, user.id, dto.selections);
   }
 
   // =================================================================
@@ -77,7 +99,10 @@ export class ElectionsController {
   @Permissions('elections.manage')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post('lists/:listId/candidates')
-  addCandidate(@Param('listId') listId: string, @Body() dto: CreateCandidateDto) {
+  addCandidate(
+    @Param('listId') listId: string,
+    @Body() dto: CreateCandidateDto,
+  ) {
     dto.candidateListId = listId;
     return this.electionsService.addCandidate(dto);
   }

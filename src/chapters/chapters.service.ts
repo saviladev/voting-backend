@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +11,10 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 
 @Injectable()
 export class ChaptersService {
-  constructor(private prisma: PrismaService, private auditService: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   list() {
     return this.prisma.chapter.findMany({
@@ -45,13 +52,17 @@ export class ChaptersService {
         (specialty) => specialty.associationId !== branch.associationId,
       );
       if (invalidAssociation) {
-        throw new ConflictException('Specialty does not belong to branch association');
+        throw new ConflictException(
+          'Specialty does not belong to branch association',
+        );
       }
       const existingAssignments = await this.prisma.chapterSpecialty.findMany({
         where: { branchId: branch.id, specialtyId: { in: dto.specialtyIds } },
       });
       if (existingAssignments.length > 0) {
-        throw new ConflictException('Some specialties already belong to a chapter in this branch');
+        throw new ConflictException(
+          'Some specialties already belong to a chapter in this branch',
+        );
       }
     }
 
@@ -65,7 +76,9 @@ export class ChaptersService {
           data: { deletedAt: null, name: dto.name, branchId: dto.branchId },
         });
         if (dto.specialtyIds) {
-          await this.prisma.chapterSpecialty.deleteMany({ where: { chapterId: restored.id } });
+          await this.prisma.chapterSpecialty.deleteMany({
+            where: { chapterId: restored.id },
+          });
           if (dto.specialtyIds.length > 0) {
             await this.prisma.chapterSpecialty.createMany({
               data: dto.specialtyIds.map((specialtyId) => ({
@@ -113,7 +126,10 @@ export class ChaptersService {
       });
       return chapter;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('Chapter already exists for this branch');
       }
       throw error;
@@ -154,7 +170,9 @@ export class ChaptersService {
         (specialty) => specialty.associationId !== branch.associationId,
       );
       if (invalidAssociation) {
-        throw new ConflictException('Specialty does not belong to branch association');
+        throw new ConflictException(
+          'Specialty does not belong to branch association',
+        );
       }
       const existingAssignments = await this.prisma.chapterSpecialty.findMany({
         where: {
@@ -164,7 +182,9 @@ export class ChaptersService {
         },
       });
       if (existingAssignments.length > 0) {
-        throw new ConflictException('Some specialties already belong to another chapter in this branch');
+        throw new ConflictException(
+          'Some specialties already belong to another chapter in this branch',
+        );
       }
     }
 
@@ -177,7 +197,9 @@ export class ChaptersService {
         },
       });
       if (dto.specialtyIds) {
-        await this.prisma.chapterSpecialty.deleteMany({ where: { chapterId: id } });
+        await this.prisma.chapterSpecialty.deleteMany({
+          where: { chapterId: id },
+        });
         if (dto.specialtyIds.length > 0) {
           await this.prisma.chapterSpecialty.createMany({
             data: dto.specialtyIds.map((specialtyId) => ({
@@ -202,7 +224,10 @@ export class ChaptersService {
       });
       return updated;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('Chapter already exists for this branch');
       }
       throw error;
@@ -210,7 +235,9 @@ export class ChaptersService {
   }
 
   async softDelete(id: string) {
-    const chapter = await this.prisma.chapter.findFirst({ where: { id, deletedAt: null } });
+    const chapter = await this.prisma.chapter.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!chapter) {
       throw new NotFoundException('Chapter not found');
     }

@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -58,7 +68,10 @@ export class RbacController {
 
   @Permissions('rbac.manage')
   @Patch('permissions/:permissionId')
-  updatePermission(@Param('permissionId') permissionId: string, @Body() dto: UpdatePermissionDto) {
+  updatePermission(
+    @Param('permissionId') permissionId: string,
+    @Body() dto: UpdatePermissionDto,
+  ) {
     return this.rbacService.updatePermission(permissionId, dto);
   }
 
@@ -94,13 +107,19 @@ export class RbacController {
 
   @Permissions('rbac.manage')
   @Post('roles/:roleId/permissions')
-  assignPermissions(@Param('roleId') roleId: string, @Body() dto: AssignPermissionsDto) {
+  assignPermissions(
+    @Param('roleId') roleId: string,
+    @Body() dto: AssignPermissionsDto,
+  ) {
     return this.rbacService.assignPermissions(roleId, dto);
   }
 
   @Permissions('rbac.manage')
   @Put('roles/:roleId/permissions')
-  replacePermissions(@Param('roleId') roleId: string, @Body() dto: AssignPermissionsDto) {
+  replacePermissions(
+    @Param('roleId') roleId: string,
+    @Body() dto: AssignPermissionsDto,
+  ) {
     return this.rbacService.replacePermissions(roleId, dto);
   }
 

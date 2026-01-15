@@ -10,7 +10,10 @@ import { MailService } from '../notifications/mail.service';
 import * as argon2 from 'argon2';
 import * as XLSX from 'xlsx';
 import { randomInt } from 'crypto';
-import { PadronImportResultDto, PadronImportSkippedDetail } from './dto/padron-import-result.dto';
+import {
+  PadronImportResultDto,
+  PadronImportSkippedDetail,
+} from './dto/padron-import-result.dto';
 
 interface PadronRow {
   dni: string;
@@ -33,12 +36,22 @@ const HEADER_ALIASES: Record<keyof PadronRow, string[]> = {
   phone: ['phone', 'telefono', 'celular'],
   branchName: ['branchname', 'sede', 'branch'],
   chapterName: ['chaptername', 'capitulo', 'chapter'],
-  isPaidUp: ['ispaidup', 'pagosaldia', 'aldiam', 'aldia', 'activo', 'habilitado'],
+  isPaidUp: [
+    'ispaidup',
+    'pagosaldia',
+    'aldiam',
+    'aldia',
+    'activo',
+    'habilitado',
+  ],
 };
 
 @Injectable()
 export class PadronService {
-  constructor(private prisma: PrismaService, private mailService: MailService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
 
   async importPadron(
     file: PadronFile,
@@ -97,10 +110,16 @@ export class PadronService {
         const chapter = await this.prisma.chapter.findFirst({
           where: {
             deletedAt: null,
-            name: { equals: row.chapterName?.trim() ?? '', mode: 'insensitive' },
+            name: {
+              equals: row.chapterName?.trim() ?? '',
+              mode: 'insensitive',
+            },
             branch: {
               deletedAt: null,
-              name: { equals: row.branchName?.trim() ?? '', mode: 'insensitive' },
+              name: {
+                equals: row.branchName?.trim() ?? '',
+                mode: 'insensitive',
+              },
             },
           },
         });
@@ -111,10 +130,15 @@ export class PadronService {
         }
         chapterId = chapter.id;
       } else {
-      if (branchName !== adminBranchName || chapterName !== adminChapterName) {
-        result.rejected.push(this.formatRejected(row, 'Capítulo fuera de tu alcance'));
-        continue;
-      }
+        if (
+          branchName !== adminBranchName ||
+          chapterName !== adminChapterName
+        ) {
+          result.rejected.push(
+            this.formatRejected(row, 'Capítulo fuera de tu alcance'),
+          );
+          continue;
+        }
         chapterId = admin.chapterId;
       }
 
@@ -144,7 +168,9 @@ export class PadronService {
         });
         result.updated += 1;
         if (wasActive && !isActive) {
-          await this.prisma.session.deleteMany({ where: { userId: existing.id } });
+          await this.prisma.session.deleteMany({
+            where: { userId: existing.id },
+          });
           result.disabled += 1;
         }
         if (wasActive !== isActive) {
@@ -200,7 +226,10 @@ export class PadronService {
             });
           }
         } catch (error) {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002'
+          ) {
             result.skipped += 1;
             this.addSkippedDetail(result, dni, 'Correo o teléfono duplicado');
             continue;
@@ -224,7 +253,9 @@ export class PadronService {
       return [];
     }
     const sheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json<Record<string, string | number | boolean>>(sheet, {
+    const json = XLSX.utils.sheet_to_json<
+      Record<string, string | number | boolean>
+    >(sheet, {
       defval: '',
     });
     if (json.length > MAX_PADRON_ROWS) {
@@ -237,7 +268,11 @@ export class PadronService {
   private mapRow(raw: Record<string, string | number | boolean>): PadronRow {
     const normalized: Record<string, string> = {};
     Object.entries(raw).forEach(([key, value]) => {
-      const normalizedKey = key.toString().trim().toLowerCase().replace(/\s|_/g, '');
+      const normalizedKey = key
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s|_/g, '');
       normalized[normalizedKey] = String(value ?? '').trim();
     });
 
@@ -279,7 +314,10 @@ export class PadronService {
   }
 
   private formatRejected(row: PadronRow, reason?: string): string {
-    const fullName = [row.firstName, row.lastName].filter(Boolean).join(' ').trim();
+    const fullName = [row.firstName, row.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     const suffix = reason ? ` (${reason})` : '';
     if (fullName) {
       return `${fullName} - ${row.dni}${suffix}`;
@@ -287,7 +325,11 @@ export class PadronService {
     return `${row.dni}${suffix}`;
   }
 
-  private addSkippedDetail(result: PadronImportResultDto, dni: string | undefined, reason: string) {
+  private addSkippedDetail(
+    result: PadronImportResultDto,
+    dni: string | undefined,
+    reason: string,
+  ) {
     if (!result.skippedDetails) {
       result.skippedDetails = [];
     }
@@ -300,7 +342,10 @@ export class PadronService {
     } satisfies PadronImportSkippedDetail);
   }
 
-  private formatName(row: PadronRow, fallback?: { firstName: string; lastName: string }) {
+  private formatName(
+    row: PadronRow,
+    fallback?: { firstName: string; lastName: string },
+  ) {
     const firstName = row.firstName ?? fallback?.firstName ?? '';
     const lastName = row.lastName ?? fallback?.lastName ?? '';
     const fullName = `${firstName} ${lastName}`.trim();

@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -16,17 +26,38 @@ export class PartiesController {
 
   @Permissions('parties.manage')
   @Get()
-  @ApiQuery({ name: 'scope', required: false, description: 'Filter by scope (NATIONAL, ASSOCIATION, BRANCH, CHAPTER)' })
-  @ApiQuery({ name: 'associationId', required: false, description: 'Filter by association ID' })
-  @ApiQuery({ name: 'branchId', required: false, description: 'Filter by branch ID' })
-  @ApiQuery({ name: 'chapterId', required: false, description: 'Filter by chapter ID' })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    description: 'Filter by scope (NATIONAL, ASSOCIATION, BRANCH, CHAPTER)',
+  })
+  @ApiQuery({
+    name: 'associationId',
+    required: false,
+    description: 'Filter by association ID',
+  })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description: 'Filter by branch ID',
+  })
+  @ApiQuery({
+    name: 'chapterId',
+    required: false,
+    description: 'Filter by chapter ID',
+  })
   listParties(
     @Query('scope') scope?: string,
     @Query('associationId') associationId?: string,
     @Query('branchId') branchId?: string,
     @Query('chapterId') chapterId?: string,
   ) {
-    return this.partiesService.listParties({ scope, associationId, branchId, chapterId });
+    return this.partiesService.listParties({
+      scope,
+      associationId,
+      branchId,
+      chapterId,
+    });
   }
 
   @Permissions('parties.manage')

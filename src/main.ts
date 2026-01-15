@@ -36,7 +36,9 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Associations API')
-    .setDescription('API for associations, branches, chapters, RBAC, and parties')
+    .setDescription(
+      'API for associations, branches, chapters, RBAC, and parties',
+    )
     .setVersion('1.0.0')
     .addBearerAuth({
       type: 'http',

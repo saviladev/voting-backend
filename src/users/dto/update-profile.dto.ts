@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, Length, ValidateIf } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  Length,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional()
@@ -28,7 +34,7 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({ description: 'Required if newPassword is provided.' })
   @IsOptional()
   @IsString()
-  @ValidateIf(o => o.newPassword)
+  @ValidateIf((o) => o.newPassword)
   @Length(8, 100)
   oldPassword?: string;
 

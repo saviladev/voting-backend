@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +11,10 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @Injectable()
 export class BranchesService {
-  constructor(private prisma: PrismaService, private auditService: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   list() {
     return this.prisma.branch.findMany({
@@ -32,10 +39,17 @@ export class BranchesService {
       if (existing.deletedAt) {
         const restored = await this.prisma.branch.update({
           where: { id: existing.id },
-          data: { deletedAt: null, name: dto.name, associationId: dto.associationId },
+          data: {
+            deletedAt: null,
+            name: dto.name,
+            associationId: dto.associationId,
+          },
         });
         await this.auditService.log('BRANCH_RESTORE', 'Branch', restored.id, {
-          metadata: { name: restored.name, associationId: restored.associationId },
+          metadata: {
+            name: restored.name,
+            associationId: restored.associationId,
+          },
         });
         return restored;
       }
@@ -55,7 +69,9 @@ export class BranchesService {
   }
 
   async update(id: string, dto: UpdateBranchDto) {
-    const branch = await this.prisma.branch.findFirst({ where: { id, deletedAt: null } });
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!branch) {
       throw new NotFoundException('Branch not found');
     }
@@ -82,7 +98,10 @@ export class BranchesService {
       });
       return updated;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('Branch already exists');
       }
       throw error;
@@ -90,7 +109,9 @@ export class BranchesService {
   }
 
   async softDelete(id: string) {
-    const branch = await this.prisma.branch.findFirst({ where: { id, deletedAt: null } });
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!branch) {
       throw new NotFoundException('Branch not found');
     }

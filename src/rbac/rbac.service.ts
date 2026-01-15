@@ -19,7 +19,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class RbacService {
-  constructor(private prisma: PrismaService, private auditService: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   listRoles() {
     return this.prisma.role.findMany({
@@ -51,7 +54,10 @@ export class RbacService {
             specialties: { include: { specialty: true } },
           },
         },
-        roles: { where: { role: { deletedAt: null } }, include: { role: true } },
+        roles: {
+          where: { role: { deletedAt: null } },
+          include: { role: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -80,7 +86,9 @@ export class RbacService {
 
     const passwordHash = await argon2.hash(dto.password);
 
-    const existing = await this.prisma.user.findUnique({ where: { dni: dto.dni } });
+    const existing = await this.prisma.user.findUnique({
+      where: { dni: dto.dni },
+    });
     if (existing) {
       if (existing.deletedAt) {
         const restored = await this.prisma.$transaction(async (tx) => {
@@ -106,7 +114,10 @@ export class RbacService {
           }
           if (roleIds.size > 0) {
             await tx.userRole.createMany({
-              data: Array.from(roleIds).map((roleId) => ({ userId: restoredUser.id, roleId })),
+              data: Array.from(roleIds).map((roleId) => ({
+                userId: restoredUser.id,
+                roleId,
+              })),
               skipDuplicates: true,
             });
           }
@@ -128,7 +139,10 @@ export class RbacService {
                 specialties: { include: { specialty: true } },
               },
             },
-            roles: { where: { role: { deletedAt: null } }, include: { role: true } },
+            roles: {
+              where: { role: { deletedAt: null } },
+              include: { role: true },
+            },
           },
         });
       }
@@ -155,7 +169,10 @@ export class RbacService {
       }
       if (roleIds.size > 0) {
         await this.prisma.userRole.createMany({
-          data: Array.from(roleIds).map((roleId) => ({ userId: user.id, roleId })),
+          data: Array.from(roleIds).map((roleId) => ({
+            userId: user.id,
+            roleId,
+          })),
           skipDuplicates: true,
         });
       }
@@ -174,7 +191,10 @@ export class RbacService {
               specialties: { include: { specialty: true } },
             },
           },
-          roles: { where: { role: { deletedAt: null } }, include: { role: true } },
+          roles: {
+            where: { role: { deletedAt: null } },
+            include: { role: true },
+          },
         },
       });
     } catch (error) {
@@ -183,7 +203,9 @@ export class RbacService {
   }
 
   async updateUser(id: string, dto: UpdateUserDto) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -207,7 +229,9 @@ export class RbacService {
       }
     }
 
-    const passwordHash = dto.password ? await argon2.hash(dto.password) : undefined;
+    const passwordHash = dto.password
+      ? await argon2.hash(dto.password)
+      : undefined;
 
     try {
       const updated = await this.prisma.$transaction(async (tx) => {
@@ -250,7 +274,10 @@ export class RbacService {
               specialties: { include: { specialty: true } },
             },
           },
-          roles: { where: { role: { deletedAt: null } }, include: { role: true } },
+          roles: {
+            where: { role: { deletedAt: null } },
+            include: { role: true },
+          },
         },
       });
     } catch (error) {
@@ -259,7 +286,9 @@ export class RbacService {
   }
 
   async deleteUser(id: string) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -281,12 +310,17 @@ export class RbacService {
   }
 
   async createRole(dto: CreateRoleDto) {
-    const existing = await this.prisma.role.findFirst({ where: { name: dto.name } });
+    const existing = await this.prisma.role.findFirst({
+      where: { name: dto.name },
+    });
     if (existing) {
       if (existing.deletedAt) {
         const restored = await this.prisma.role.update({
           where: { id: existing.id },
-          data: { deletedAt: null, description: dto.description ?? existing.description },
+          data: {
+            deletedAt: null,
+            description: dto.description ?? existing.description,
+          },
         });
         await this.auditService.log('RBAC_RESTORE_ROLE', 'Role', restored.id, {
           metadata: { name: restored.name },
@@ -304,12 +338,17 @@ export class RbacService {
   }
 
   async updateRole(id: string, dto: UpdateRoleDto) {
-    const role = await this.prisma.role.findFirst({ where: { id, deletedAt: null } });
+    const role = await this.prisma.role.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
     try {
-      const updated = await this.prisma.role.update({ where: { id }, data: dto });
+      const updated = await this.prisma.role.update({
+        where: { id },
+        data: dto,
+      });
       await this.auditService.log('RBAC_UPDATE_ROLE', 'Role', updated.id, {
         metadata: { name: updated.name },
       });
@@ -327,32 +366,55 @@ export class RbacService {
       if (existing.deletedAt) {
         const restored = await this.prisma.permission.update({
           where: { id: existing.id },
-          data: { deletedAt: null, description: dto.description ?? existing.description },
+          data: {
+            deletedAt: null,
+            description: dto.description ?? existing.description,
+          },
         });
-        await this.auditService.log('RBAC_RESTORE_PERMISSION', 'Permission', restored.id, {
-          metadata: { key: restored.key },
-        });
+        await this.auditService.log(
+          'RBAC_RESTORE_PERMISSION',
+          'Permission',
+          restored.id,
+          {
+            metadata: { key: restored.key },
+          },
+        );
         return restored;
       }
       throw new ConflictException('Permission already exists');
     }
     const permission = await this.prisma.permission.create({ data: dto });
-    await this.auditService.log('RBAC_CREATE_PERMISSION', 'Permission', permission.id, {
-      metadata: { key: permission.key },
-    });
+    await this.auditService.log(
+      'RBAC_CREATE_PERMISSION',
+      'Permission',
+      permission.id,
+      {
+        metadata: { key: permission.key },
+      },
+    );
     return permission;
   }
 
   async updatePermission(id: string, dto: UpdatePermissionDto) {
-    const permission = await this.prisma.permission.findFirst({ where: { id, deletedAt: null } });
+    const permission = await this.prisma.permission.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!permission) {
       throw new NotFoundException('Permission not found');
     }
     try {
-      const updated = await this.prisma.permission.update({ where: { id }, data: dto });
-      await this.auditService.log('RBAC_UPDATE_PERMISSION', 'Permission', updated.id, {
-        metadata: { key: updated.key },
+      const updated = await this.prisma.permission.update({
+        where: { id },
+        data: dto,
       });
+      await this.auditService.log(
+        'RBAC_UPDATE_PERMISSION',
+        'Permission',
+        updated.id,
+        {
+          metadata: { key: updated.key },
+        },
+      );
       return updated;
     } catch (error) {
       this.handleUnique(error, 'Permission already exists');
@@ -360,13 +422,17 @@ export class RbacService {
   }
 
   async assignPermissions(roleId: string, dto: AssignPermissionsDto) {
-    const role = await this.prisma.role.findFirst({ where: { id: roleId, deletedAt: null } });
+    const role = await this.prisma.role.findFirst({
+      where: { id: roleId, deletedAt: null },
+    });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
 
     const permissionKeys = Array.from(
-      new Set(dto.permissions.map((permission) => permission.trim()).filter(Boolean)),
+      new Set(
+        dto.permissions.map((permission) => permission.trim()).filter(Boolean),
+      ),
     );
 
     const permissions = await this.prisma.permission.findMany({
@@ -396,13 +462,17 @@ export class RbacService {
   }
 
   async replacePermissions(roleId: string, dto: AssignPermissionsDto) {
-    const role = await this.prisma.role.findFirst({ where: { id: roleId, deletedAt: null } });
+    const role = await this.prisma.role.findFirst({
+      where: { id: roleId, deletedAt: null },
+    });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
 
     const permissionKeys = Array.from(
-      new Set(dto.permissions.map((permission) => permission.trim()).filter(Boolean)),
+      new Set(
+        dto.permissions.map((permission) => permission.trim()).filter(Boolean),
+      ),
     );
 
     const permissions = await this.prisma.permission.findMany({
@@ -436,12 +506,16 @@ export class RbacService {
   }
 
   async assignRolesToUser(userId: string, dto: AssignRolesDto) {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const roleNames = Array.from(new Set(dto.roles.map((role) => role.trim()).filter(Boolean)));
+    const roleNames = Array.from(
+      new Set(dto.roles.map((role) => role.trim()).filter(Boolean)),
+    );
 
     const roles = await this.prisma.role.findMany({
       where: { name: { in: roleNames }, deletedAt: null },
@@ -467,12 +541,16 @@ export class RbacService {
   }
 
   async replaceRolesForUser(userId: string, dto: AssignRolesDto) {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const roleNames = Array.from(new Set(dto.roles.map((role) => role.trim()).filter(Boolean)));
+    const roleNames = Array.from(
+      new Set(dto.roles.map((role) => role.trim()).filter(Boolean)),
+    );
 
     const roles = await this.prisma.role.findMany({
       where: { name: { in: roleNames }, deletedAt: null },
@@ -502,12 +580,16 @@ export class RbacService {
   }
 
   async assignRolesToUserByDni(dni: string, dto: AssignRolesDto) {
-    const user = await this.prisma.user.findFirst({ where: { dni, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { dni, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const roleNames = Array.from(new Set(dto.roles.map((role) => role.trim()).filter(Boolean)));
+    const roleNames = Array.from(
+      new Set(dto.roles.map((role) => role.trim()).filter(Boolean)),
+    );
 
     const roles = await this.prisma.role.findMany({
       where: { name: { in: roleNames }, deletedAt: null },
@@ -533,7 +615,9 @@ export class RbacService {
   }
 
   async replaceRolesForUserByDni(dni: string, dto: AssignRolesDto) {
-    const user = await this.prisma.user.findFirst({ where: { dni, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { dni, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -541,11 +625,16 @@ export class RbacService {
   }
 
   async deleteRole(id: string) {
-    const role = await this.prisma.role.findFirst({ where: { id, deletedAt: null } });
+    const role = await this.prisma.role.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
-    await this.prisma.role.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.role.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     await this.auditService.log('RBAC_DELETE_ROLE', 'Role', role.id, {
       metadata: { name: role.name },
     });
@@ -553,19 +642,32 @@ export class RbacService {
   }
 
   async deletePermission(id: string) {
-    const permission = await this.prisma.permission.findFirst({ where: { id, deletedAt: null } });
+    const permission = await this.prisma.permission.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!permission) {
       throw new NotFoundException('Permission not found');
     }
-    await this.prisma.permission.update({ where: { id }, data: { deletedAt: new Date() } });
-    await this.auditService.log('RBAC_DELETE_PERMISSION', 'Permission', permission.id, {
-      metadata: { key: permission.key },
+    await this.prisma.permission.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
+    await this.auditService.log(
+      'RBAC_DELETE_PERMISSION',
+      'Permission',
+      permission.id,
+      {
+        metadata: { key: permission.key },
+      },
+    );
     return { success: true };
   }
 
   private handleUnique(error: unknown, message: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
       throw new ConflictException(message);
     }
     throw error;

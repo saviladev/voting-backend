@@ -49,7 +49,9 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const passwordHash = await argon2.hash(dto.password);
-    const chapter = await this.prisma.chapter.findUnique({ where: { id: dto.chapterId } });
+    const chapter = await this.prisma.chapter.findUnique({
+      where: { id: dto.chapterId },
+    });
     if (!chapter || chapter.deletedAt) {
       throw new BadRequestException('Invalid chapter');
     }
@@ -68,7 +70,9 @@ export class AuthService {
       });
 
       // Assign default member role if it exists
-      const memberRole = await this.prisma.role.findUnique({ where: { name: 'Member' } });
+      const memberRole = await this.prisma.role.findUnique({
+        where: { name: 'Member' },
+      });
       if (memberRole) {
         await this.prisma.userRole.create({
           data: { roleId: memberRole.id, userId: user.id },
@@ -109,7 +113,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const sessionTtlSeconds = parseDurationToSeconds(this.configService.get<string>('JWT_EXPIRES_IN'));
+    const sessionTtlSeconds = parseDurationToSeconds(
+      this.configService.get<string>('JWT_EXPIRES_IN'),
+    );
 
     const result = await this.prisma.$transaction(
       async (tx) => {
@@ -122,7 +128,7 @@ export class AuthService {
           expiresIn: sessionTtlSeconds,
         });
 
-        const decoded = this.jwtService.decode(token) as JwtPayload & { exp?: number };
+        const decoded = this.jwtService.decode(token);
         const expiresAt = decoded?.exp
           ? new Date(decoded.exp * 1000)
           : new Date(Date.now() + sessionTtlSeconds * 1000);
@@ -157,7 +163,9 @@ export class AuthService {
     const roles = userWithRbac?.roles.map((r) => r.role.name) ?? [];
     const permissions = Array.from(
       new Set(
-        userWithRbac?.roles.flatMap((r) => r.role.permissions.map((p) => p.permission.key)) ?? [],
+        userWithRbac?.roles.flatMap((r) =>
+          r.role.permissions.map((p) => p.permission.key),
+        ) ?? [],
       ),
     );
 
@@ -177,7 +185,9 @@ export class AuthService {
   }
 
   async requestPasswordReset(dto: ForgotPasswordDto) {
-    const genericResponse = { message: 'If the account exists, an email has been sent.' };
+    const genericResponse = {
+      message: 'If the account exists, an email has been sent.',
+    };
     const user = await this.prisma.user.findUnique({ where: { dni: dto.dni } });
     if (!user || user.deletedAt || !user.email) {
       return genericResponse;
@@ -200,7 +210,8 @@ export class AuthService {
     });
 
     const baseUrl =
-      this.configService.get<string>('PASSWORD_RESET_URL') ?? 'http://localhost:8100/login/reset';
+      this.configService.get<string>('PASSWORD_RESET_URL') ??
+      'http://localhost:8100/login/reset';
     const resetUrl = `${baseUrl}?token=${token}`;
     await this.mailService.sendPasswordResetEmail({
       to: user.email,
@@ -208,7 +219,9 @@ export class AuthService {
       resetUrl,
     });
 
-    await this.auditService.log('PASSWORD_RESET_REQUEST', 'User', user.id, { userId: user.id });
+    await this.auditService.log('PASSWORD_RESET_REQUEST', 'User', user.id, {
+      userId: user.id,
+    });
 
     return genericResponse;
   }
@@ -242,7 +255,9 @@ export class AuthService {
       await tx.session.deleteMany({ where: { userId: record.userId } });
     });
 
-    await this.auditService.log('PASSWORD_RESET', 'User', record.userId, { userId: record.userId });
+    await this.auditService.log('PASSWORD_RESET', 'User', record.userId, {
+      userId: record.userId,
+    });
 
     return { message: 'Password updated' };
   }
@@ -267,12 +282,20 @@ export class AuthService {
   ): Promise<
     Prisma.UserGetPayload<{
       include: {
-        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } };
+        roles: {
+          include: {
+            role: {
+              include: { permissions: { include: { permission: true } } };
+            };
+          };
+        };
       };
     }>
   > {
     const tokenHash = sha256(token);
-    const session = await this.prisma.session.findUnique({ where: { tokenHash } });
+    const session = await this.prisma.session.findUnique({
+      where: { tokenHash },
+    });
     if (!session) {
       throw new UnauthorizedException('Session expired');
     }

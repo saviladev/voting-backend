@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import * as argon2 from 'argon2';
@@ -9,7 +13,9 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findById(id: string) {
-    const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -42,13 +48,13 @@ export class UsersService {
                   select: {
                     id: true,
                     name: true,
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -57,7 +63,9 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -71,13 +79,18 @@ export class UsersService {
 
     // Handle password change
     if (dto.newPassword && dto.oldPassword) {
-      const passwordMatch = await argon2.verify(user.passwordHash, dto.oldPassword);
+      const passwordMatch = await argon2.verify(
+        user.passwordHash,
+        dto.oldPassword,
+      );
       if (!passwordMatch) {
         throw new BadRequestException('Invalid old password');
       }
       dataToUpdate.passwordHash = await argon2.hash(dto.newPassword);
     } else if (dto.newPassword && !dto.oldPassword) {
-      throw new BadRequestException('Old password is required to set a new password.');
+      throw new BadRequestException(
+        'Old password is required to set a new password.',
+      );
     }
 
     const updated = await this.prisma.user.update({
@@ -103,13 +116,13 @@ export class UsersService {
                   select: {
                     id: true,
                     name: true,
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     return updated;

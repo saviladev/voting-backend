@@ -4,7 +4,10 @@ export function truncateToHour(date: Date): Date {
   return truncated;
 }
 
-export function parseDurationToSeconds(value?: string | number, defaultSeconds = 900): number {
+export function parseDurationToSeconds(
+  value?: string | number,
+  defaultSeconds = 900,
+): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PartyScope, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +12,10 @@ import { UpdatePartyDto } from './dto/update-party.dto';
 
 @Injectable()
 export class PartiesService {
-  constructor(private prisma: PrismaService, private auditService: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   listParties(filters?: {
     scope?: string;
@@ -29,12 +37,12 @@ export class PartiesService {
     // - Party scope is NATIONAL (available for all elections)
     // - Party scope matches election scope AND belongs to the same entity
     // - Party scope is "higher" in hierarchy (e.g., ASSOCIATION party can be used in BRANCH/CHAPTER elections of that association)
-    
+
     const whereConditions: any[] = [];
-    
+
     // National parties are always available
     whereConditions.push({ scope: 'NATIONAL' });
-    
+
     if (filters.scope === 'ASSOCIATION' && filters.associationId) {
       // For ASSOCIATION elections: show NATIONAL + ASSOCIATION parties of the same association
       whereConditions.push({
@@ -85,7 +93,9 @@ export class PartiesService {
 
   async createParty(dto: CreatePartyDto) {
     const scopeData = await this.buildScopeData(dto);
-    const existing = await this.prisma.politicalParty.findFirst({ where: { name: dto.name } });
+    const existing = await this.prisma.politicalParty.findFirst({
+      where: { name: dto.name },
+    });
     if (existing) {
       if (existing.deletedAt) {
         const restored = await this.prisma.politicalParty.update({
@@ -101,7 +111,12 @@ export class PartiesService {
             isActive: dto.isActive ?? true,
           },
         });
-        await this.auditService.log('PARTY_RESTORE', 'PoliticalParty', restored.id, {});
+        await this.auditService.log(
+          'PARTY_RESTORE',
+          'PoliticalParty',
+          restored.id,
+          {},
+        );
         return restored;
       }
       throw new ConflictException('Party already exists');
@@ -118,7 +133,12 @@ export class PartiesService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.auditService.log('PARTY_CREATED', 'PoliticalParty', party.id, {});
+    await this.auditService.log(
+      'PARTY_CREATED',
+      'PoliticalParty',
+      party.id,
+      {},
+    );
     return party;
   }
 
@@ -146,7 +166,12 @@ export class PartiesService {
           isActive: dto.isActive,
         },
       });
-      await this.auditService.log('PARTY_UPDATED', 'PoliticalParty', party.id, {});
+      await this.auditService.log(
+        'PARTY_UPDATED',
+        'PoliticalParty',
+        party.id,
+        {},
+      );
       return party;
     } catch (error) {
       this.handleUnique(error, 'Party already exists');
@@ -159,12 +184,19 @@ export class PartiesService {
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
-    await this.auditService.log('PARTY_DELETED', 'PoliticalParty', party.id, {});
+    await this.auditService.log(
+      'PARTY_DELETED',
+      'PoliticalParty',
+      party.id,
+      {},
+    );
     return { success: true };
   }
 
   private async ensureParty(id: string) {
-    const party = await this.prisma.politicalParty.findFirst({ where: { id, deletedAt: null } });
+    const party = await this.prisma.politicalParty.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!party) {
       throw new NotFoundException('Party not found');
     }
@@ -185,12 +217,19 @@ export class PartiesService {
     }
 
     if (dto.scope === PartyScope.NATIONAL) {
-      return { scope: PartyScope.NATIONAL, associationId: null, branchId: null, chapterId: null };
+      return {
+        scope: PartyScope.NATIONAL,
+        associationId: null,
+        branchId: null,
+        chapterId: null,
+      };
     }
 
     if (dto.scope === PartyScope.ASSOCIATION) {
       if (!dto.associationId) {
-        throw new BadRequestException('associationId is required for ASSOCIATION scope');
+        throw new BadRequestException(
+          'associationId is required for ASSOCIATION scope',
+        );
       }
       const association = await this.prisma.association.findFirst({
         where: { id: dto.associationId, deletedAt: null },
@@ -198,7 +237,12 @@ export class PartiesService {
       if (!association) {
         throw new BadRequestException('Association not found');
       }
-      return { scope: PartyScope.ASSOCIATION, associationId: dto.associationId, branchId: null, chapterId: null };
+      return {
+        scope: PartyScope.ASSOCIATION,
+        associationId: dto.associationId,
+        branchId: null,
+        chapterId: null,
+      };
     }
 
     if (dto.scope === PartyScope.BRANCH) {
@@ -211,12 +255,19 @@ export class PartiesService {
       if (!branch) {
         throw new BadRequestException('Branch not found');
       }
-      return { scope: PartyScope.BRANCH, associationId: null, branchId: dto.branchId, chapterId: null };
+      return {
+        scope: PartyScope.BRANCH,
+        associationId: null,
+        branchId: dto.branchId,
+        chapterId: null,
+      };
     }
 
     if (dto.scope === PartyScope.CHAPTER) {
       if (!dto.chapterId) {
-        throw new BadRequestException('chapterId is required for CHAPTER scope');
+        throw new BadRequestException(
+          'chapterId is required for CHAPTER scope',
+        );
       }
       const chapter = await this.prisma.chapter.findFirst({
         where: { id: dto.chapterId, deletedAt: null },
@@ -224,7 +275,12 @@ export class PartiesService {
       if (!chapter) {
         throw new BadRequestException('Chapter not found');
       }
-      return { scope: PartyScope.CHAPTER, associationId: null, branchId: null, chapterId: dto.chapterId };
+      return {
+        scope: PartyScope.CHAPTER,
+        associationId: null,
+        branchId: null,
+        chapterId: dto.chapterId,
+      };
     }
 
     if (allowExisting) {
@@ -240,7 +296,10 @@ export class PartiesService {
   }
 
   private handleUnique(error: unknown, message: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
       throw new ConflictException(message);
     }
     throw error;

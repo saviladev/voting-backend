@@ -1,40 +1,95 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ElectionsService } from './elections.service';
 import { CreateElectionDto } from './dto/create-election.dto';
 import { CreateCandidateListDto } from './dto/create-candidate-list.dto';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
-import { UpdateVoteCountDto } from './dto/update-vote-count.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { RequestUser } from '../common/interfaces/request-user.interface';
+import { BulkVoteDto } from './dto/bulk-vote.dto';
 
 @ApiTags('elections')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('elections')
 export class ElectionsController {
   constructor(private readonly electionsService: ElectionsService) {}
 
+  // =================================================================
+  // == Member-specific endpoints
+  // =================================================================
+
+  @Roles('Member')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('votable')
+  getVotableElections(@CurrentUser() user: RequestUser) {
+    return this.electionsService.getVotableElections(user.id);
+  }
+
+  /*
+  @Roles('Member')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post(':id/vote')
+  vote(
+    @Param('id') electionId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateVoteDto,
+  ) {
+    return this.electionsService.vote(electionId, user.id, dto.candidateId);
+  }
+  */
+
+  @Roles('Member')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post(':id/bulk-vote')
+  bulkVote(
+    @Param('id') electionId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: BulkVoteDto,
+  ) {
+    return this.electionsService.bulkVote(electionId, user.id, dto.selections);
+  }
+
+  // =================================================================
+  // == Admin-specific endpoints
+  // =================================================================
+
   @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post()
   create(@Body() createElectionDto: CreateElectionDto) {
     return this.electionsService.create(createElectionDto);
   }
 
   @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get()
   findAll() {
     return this.electionsService.findAll();
   }
 
   @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.electionsService.findOne(id);
   }
 
   @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post(':id/lists')
   createList(@Param('id') id: string, @Body() dto: CreateCandidateListDto) {
     dto.electionId = id;
@@ -42,8 +97,12 @@ export class ElectionsController {
   }
 
   @Permissions('elections.manage')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post('lists/:listId/candidates')
-  addCandidate(@Param('listId') listId: string, @Body() dto: CreateCandidateDto) {
+  addCandidate(
+    @Param('listId') listId: string,
+    @Body() dto: CreateCandidateDto,
+  ) {
     dto.candidateListId = listId;
     return this.electionsService.addCandidate(dto);
   }
@@ -52,7 +111,7 @@ export class ElectionsController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: any) {
-      return this.electionsService.update(id, dto);
+    return this.electionsService.update(id, dto);
   }
 
   @Permissions('elections.manage')
@@ -74,17 +133,6 @@ export class ElectionsController {
   @Delete('candidates/:candidateId')
   deleteCandidate(@Param('candidateId') candidateId: string) {
     return this.electionsService.deleteCandidate(candidateId);
-  }
-
-  // NEW: Update vote count for a candidate
-  @Permissions('elections.manage')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Patch('candidates/:candidateId/vote-count')
-  updateVoteCount(
-    @Param('candidateId') candidateId: string,
-    @Body() dto: UpdateVoteCountDto,
-  ) {
-    return this.electionsService.updateCandidateVoteCount(candidateId, dto);
   }
 
   // NEW: Get election results (COMPLETED elections only)

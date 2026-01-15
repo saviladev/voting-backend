@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +11,10 @@ import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
 
 @Injectable()
 export class SpecialtiesService {
-  constructor(private prisma: PrismaService, private auditService: AuditService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   list() {
     return this.prisma.specialty.findMany({
@@ -33,11 +40,20 @@ export class SpecialtiesService {
       if (existing.deletedAt) {
         const restored = await this.prisma.specialty.update({
           where: { id: existing.id },
-          data: { deletedAt: null, name: dto.name, associationId: dto.associationId },
+          data: {
+            deletedAt: null,
+            name: dto.name,
+            associationId: dto.associationId,
+          },
         });
-        await this.auditService.log('SPECIALTY_RESTORE', 'Specialty', restored.id, {
-          metadata: { name: restored.name },
-        });
+        await this.auditService.log(
+          'SPECIALTY_RESTORE',
+          'Specialty',
+          restored.id,
+          {
+            metadata: { name: restored.name },
+          },
+        );
         return restored;
       }
       throw new ConflictException('Specialty already exists');
@@ -52,7 +68,9 @@ export class SpecialtiesService {
   }
 
   async update(id: string, dto: UpdateSpecialtyDto) {
-    const specialty = await this.prisma.specialty.findFirst({ where: { id, deletedAt: null } });
+    const specialty = await this.prisma.specialty.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!specialty) {
       throw new NotFoundException('Specialty not found');
     }
@@ -76,7 +94,10 @@ export class SpecialtiesService {
       });
       return updated;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('Specialty already exists');
       }
       throw error;
@@ -84,7 +105,9 @@ export class SpecialtiesService {
   }
 
   async softDelete(id: string) {
-    const specialty = await this.prisma.specialty.findFirst({ where: { id, deletedAt: null } });
+    const specialty = await this.prisma.specialty.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!specialty) {
       throw new NotFoundException('Specialty not found');
     }

@@ -28,7 +28,9 @@ export class ElectionSchedulerService {
           where: { id: election.id },
           data: { status: 'OPEN' },
         });
-        this.logger.log(`Auto-opened election: ${election.name} (${election.id})`);
+        this.logger.log(
+          `Auto-opened election: ${election.name} (${election.id})`,
+        );
       }
 
       // Auto-close elections: OPEN -> CLOSED when endDate has passed
@@ -46,7 +48,9 @@ export class ElectionSchedulerService {
           where: { id: election.id },
           data: { status: 'CLOSED' },
         });
-        this.logger.log(`Auto-closed election: ${election.name} (${election.id})`);
+        this.logger.log(
+          `Auto-closed election: ${election.name} (${election.id})`,
+        );
       }
 
       if (electionsToOpen.length > 0 || electionsToClose.length > 0) {

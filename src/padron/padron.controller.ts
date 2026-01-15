@@ -1,5 +1,18 @@
-import { BadRequestException, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Controller,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -23,7 +36,8 @@ export class PadronController {
   @Permissions('padron.manage')
   @Post('import')
   @ApiOperation({
-    summary: 'Importar padrón (crea, actualiza, activa/desactiva según isPaidUp)',
+    summary:
+      'Importar padrón (crea, actualiza, activa/desactiva según isPaidUp)',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -42,7 +56,10 @@ export class PadronController {
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, callback) => {
         if (!file.originalname.toLowerCase().endsWith('.xlsx')) {
-          return callback(new BadRequestException('Only .xlsx files are allowed'), false);
+          return callback(
+            new BadRequestException('Only .xlsx files are allowed'),
+            false,
+          );
         }
         callback(null, true);
       },

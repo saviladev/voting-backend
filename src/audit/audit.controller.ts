@@ -11,7 +11,7 @@ export class AuditController {
   constructor(private auditService: AuditService) {}
 
   @Get('logs')
-@Permissions('rbac.manage')
+  @Permissions('rbac.manage')
   listLogs(@Query() query: ListAuditLogsDto) {
     return this.auditService.listLogs(query);
   }

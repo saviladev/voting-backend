@@ -19,7 +19,10 @@ export class UsersController {
   }
 
   @Patch('me')
-  async updateMe(@Body() dto: UpdateProfileDto, @CurrentUser() user?: RequestUser) {
-    return this.usersService.updateProfile(user?.id, dto);
+  async updateMe(
+    @Body() dto: UpdateProfileDto,
+    @CurrentUser() user?: RequestUser,
+  ) {
+    return this.usersService.updateProfile(user?.id ?? '', dto);
   }
 }

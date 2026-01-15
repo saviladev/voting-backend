@@ -2,6 +2,8 @@
 
 Backend para gestión de colegiados con Auth, RBAC, estructura organizacional (Association/Branch/Chapter/Specialty), partidos políticos, padrón por Excel y auditoría. Incluye auth con DNI+password y sesión única.
 
+> **Note:** For Docker deployment, see the main [README.md](../README.md) in the project root. The `docker-compose.yml` file is located at the project root level.
+
 ### Requisitos
 
 - Node 18+
@@ -107,3 +109,227 @@ Ejemplos de archivo (mismo formato, se procesan con `/padron/import`): `padron_i
 ### Notas
 - Todas las operaciones `DELETE` son soft-delete (usa `deletedAt`).
 - Sesión única: cada login invalida sesiones anteriores.
+
+---
+
+## Docker Deployment (Production)
+
+### Requisitos
+- Docker 20.10+
+- Docker Compose 2.0+
+
+### Configuración Inicial
+
+1) **Copia el archivo de entorno de producción:**
+```bash
+cp .env.production .env
+```
+
+2) **Edita `.env` con tus valores de producción:**
+   - Cambia `POSTGRES_PASSWORD` por una contraseña segura
+   - Actualiza `JWT_SECRET` con un secreto seguro
+   - Configura `CORS_ORIGINS` con tus dominios permitidos
+   - Actualiza `PASSWORD_RESET_URL` con tu URL de frontend
+   - Configura SMTP si necesitas envío de correos
+   - Personaliza los datos de seed (admin, asociación, etc.)
+
+### Despliegue
+
+1) **Construir e iniciar los servicios:**
+```bash
+docker-compose up -d --build
+```
+
+Esto iniciará:
+- `voting-db`: PostgreSQL 15 (Supabase)
+- `voting-studio`: Supabase Studio (Database UI)
+- `voting-backend`: NestJS API
+
+2) **Verificar que los servicios estén corriendo:**
+```bash
+docker-compose ps
+```
+
+3) **Inicializar la base de datos (primera vez):**
+
+Generar cliente Prisma:
+```bash
+docker-compose exec app npx prisma generate
+```
+
+Ejecutar migraciones:
+```bash
+docker-compose exec app npx prisma migrate deploy
+```
+
+Ejecutar seeds (crear roles, permisos, admin):
+```bash
+docker-compose exec app npx prisma db seed
+```
+
+4) **Verificar la aplicación:**
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/docs`
+- Health Check: `http://localhost:3000/health`
+- **Supabase Studio**: `http://localhost:3001` (Database Management UI)
+
+### Comandos Útiles
+
+**Ver logs:**
+```bash
+# Todos los servicios
+docker-compose logs -f
+
+# Solo backend
+docker-compose logs -f app
+
+# Solo base de datos
+docker-compose logs -f db
+```
+
+**Reiniciar servicios:**
+```bash
+# Todos
+docker-compose restart
+
+# Solo backend
+docker-compose restart app
+```
+
+**Detener servicios:**
+```bash
+docker-compose down
+```
+
+**Detener y eliminar volúmenes (⚠️ elimina datos):**
+```bash
+docker-compose down -v
+```
+
+**Acceder al contenedor:**
+```bash
+# Backend
+docker-compose exec app sh
+
+# Base de datos
+docker-compose exec db psql -U postgres -d voting
+```
+
+**Ejecutar migraciones en producción:**
+```bash
+docker-compose exec app npx prisma migrate deploy
+```
+
+**Ver estado de la base de datos:**
+```bash
+docker-compose exec app npx prisma db pull
+```
+
+### Actualización de la Aplicación
+
+1) **Detener el backend:**
+```bash
+docker-compose stop app
+```
+
+2) **Reconstruir con nuevos cambios:**
+```bash
+docker-compose build app
+```
+
+3) **Ejecutar migraciones si hay cambios en el schema:**
+```bash
+docker-compose exec app npx prisma migrate deploy
+```
+
+4) **Reiniciar el backend:**
+```bash
+docker-compose up -d app
+```
+
+### Backup de Base de Datos
+
+**Crear backup:**
+```bash
+docker-compose exec db pg_dump -U postgres voting > backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+**Restaurar backup:**
+```bash
+cat backup_file.sql | docker-compose exec -T db psql -U postgres -d voting
+```
+
+### Supabase Studio - Database Management UI
+
+Supabase Studio provides a web-based interface to manage your PostgreSQL database visually.
+
+**Access:** `http://localhost:3001`
+
+**Features:**
+- 📊 **Table Editor**: Browse and edit data with a spreadsheet-like interface
+- 🔍 **SQL Editor**: Run custom queries with syntax highlighting
+- 📈 **Schema Viewer**: Visualize database structure and relationships
+- 👥 **User Browser**: View all users in the `User` table
+- 📝 **Query History**: Review previously executed queries
+- 🔐 **Database Policies**: View RLS policies (if enabled)
+
+**Common Tasks:**
+
+*View all users:*
+1. Open Studio at `http://localhost:3001`
+2. Navigate to "Table Editor"
+3. Select the `User` table
+4. Browse, search, and filter users
+
+*Run custom queries:*
+1. Go to "SQL Editor"
+2. Write your query (e.g., `SELECT * FROM "User" WHERE "isActive" = true`)
+3. Click "Run" or press `Ctrl+Enter`
+
+*Check election results:*
+```sql
+SELECT 
+  c."firstName", 
+  c."lastName", 
+  c."voteCount",
+  cl."name" as "listName"
+FROM "Candidate" c
+JOIN "CandidateList" cl ON c."candidateListId" = cl.id
+ORDER BY c."voteCount" DESC;
+```
+
+*View audit logs:*
+```sql
+SELECT 
+  a.action,
+  a.entity,
+  a."createdAt",
+  u."firstName" || ' ' || u."lastName" as "userName"
+FROM "AuditLog" a
+LEFT JOIN "User" u ON a."userId" = u.id
+ORDER BY a."createdAt" DESC
+LIMIT 50;
+```
+
+**Note:** Studio connects directly to the PostgreSQL database, so changes made here will affect your production data. Use with caution!
+
+### Troubleshooting
+
+**El backend no se conecta a la base de datos:**
+- Verifica que el servicio `db` esté healthy: `docker-compose ps`
+- Revisa logs: `docker-compose logs db`
+- Verifica la `DATABASE_URL` en `.env`
+
+**Error de permisos en Prisma:**
+- Regenera el cliente: `docker-compose exec app npx prisma generate`
+
+**Puerto ya en uso:**
+- Cambia `APP_PORT` en `.env` a otro puerto (ej. 3001)
+- O detén el servicio que usa el puerto 3000
+
+**Limpiar todo y empezar de nuevo:**
+```bash
+docker-compose down -v
+docker-compose up -d --build
+# Luego ejecuta migraciones y seeds nuevamente
+```

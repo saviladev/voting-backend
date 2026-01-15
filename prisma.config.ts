@@ -3,13 +3,18 @@
 import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
+// Detect environment
+const isDev = process.env.NODE_ENV !== "production";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
-    seed: "ts-node prisma/seed.ts",
+    seed: isDev 
+      ? "ts-node prisma/seed.ts" 
+      : "node dist/prisma/seed.js",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    url: isDev ? env("DATABASE_URL") : (process.env.DATABASE_URL || ""),
   },
 });
